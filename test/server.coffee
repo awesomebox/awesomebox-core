@@ -2,7 +2,7 @@ fs = require 'fs'
 path = require 'path'
 mime = require 'mime'
 express = require 'express'
-{helpers, Renderer} = require './awesomebox'
+{helpers, Renderer} = require '../'
 
 app = express()
 # renderer = new Renderer(root: path.join(__dirname, '../test/content'))
