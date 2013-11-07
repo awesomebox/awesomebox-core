@@ -1,0 +1,7 @@
+<p>FOO!!!</p>
+
+<ul>
+<% team.forEach(function(t) { %>
+  <li><a href="mailto:<%= t.email %>"><%= t.name %></a></li>
+<% }) %>
+</ul>

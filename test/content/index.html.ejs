@@ -1,0 +1,22 @@
+{{{
+  "words": [
+    "hello",
+    "world!"
+  ],
+  team: box.data('/foo/bar/team'),
+  quotes: box.data("http://query.yahooapis.com/v1/public/yql?q=select%20*%20from%20yahoo.finance.quotes%20where%20symbol%20in%20(%22YHOO%22%2C%22AAPL%22%2C%22GOOG%22%2C%22MSFT%22)%0A%09%09&env=http%3A%2F%2Fdatatables.org%2Falltables.env&format=json")
+}}}
+
+<h1>Hello World!</h1>
+<ul>
+<% words.forEach(function(i) { %>
+  <li><%= i %></li>
+<% }) %>
+</ul>
+
+<%- box.content('/foo', {team: team}) %>
+
+<h2>Quotes</h2>
+<% quotes.query.results.quote.forEach(function(q) { %>
+  <p><strong><%= q.symbol %></strong>: <%= q.Ask %> - <%= q.Bid %></p>
+<% }) %>

@@ -1,0 +1,22 @@
+<!doctype html>
+<html>
+<head>
+  <style type="text/less">
+  @primary-color: yellow;
+  body {
+    background: red;
+    p {
+      color: blue;
+      border: 1px solid @primary-color;
+    }
+  }
+  </style>
+  
+  <script type="text/coffeescript">
+  alert 'hey!'
+  </script>
+</head>
+<body>
+  <%- box.content() %>
+</body>
+</html>
