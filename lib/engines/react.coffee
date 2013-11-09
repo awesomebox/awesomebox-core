@@ -9,7 +9,8 @@ remove_comments = (v) ->
 
 exports.process = (opts, data) ->
   q = require 'q'
+  os = require 'os'
   react = require 'react-tools'
   
-  content = '/** @jsx React.DOM */\n' + remove_comments(opts.content.toString())
+  content = '/** @jsx React.DOM */' + os.EOL + remove_comments(opts.content.toString())
   q.ninvoke(react, 'transform', content)

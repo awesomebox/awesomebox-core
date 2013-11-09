@@ -1,12 +1,15 @@
 q = require 'q'
 fs = require 'fs'
 vm = require 'vm'
+os = require 'os'
 path = require 'path'
+yaml = require 'js-yaml'
 cheerio = require 'cheerio'
 request = require './request'
 
 exports.engines = require './engines'
 helpers = exports.helpers = require './helpers'
+Steps = require './steps'
 
 PARTIAL_INDEX = 12345
 
@@ -26,7 +29,7 @@ box_methods = (opts) ->
     key = "<!-- [[PARTIAL-#{++PARTIAL_INDEX}]] -->"
     
     opts.promises.push(
-      new Renderer(root: opts.root, layouts_disabled: true, indent: (opts.index or 0) + 1).render(file, data)
+      new Renderer(root: opts.root, parent: opts.renderer, layouts_disabled: true).render(file, data)
       .then (res) ->
         opts.content = opts.content.toString().replace(key, res.content.toString())
     )
@@ -48,7 +51,7 @@ box_methods = (opts) ->
 
 strip_bom = (opts) ->
   opts.content = opts.content.toString('utf8')
-  opts.content = content.slice(1) if content.charCodeAt(0) is 0xFEFF
+  opts.content = opts.content.slice(1) if opts.content.charCodeAt(0) is 0xFEFF
 
 parse_filename = (opts) ->
   parsed = helpers.parse_filename(opts.filename)
@@ -75,11 +78,12 @@ render = (opts) ->
   , q()
 
 parse_front_matter = (opts) ->
-  rx_json = /^(\s*\{\{\{([\s\S]+?)\}\}\}\s*)/gi
-  # rx_yaml = /^(\s*\{\{\{([\s\S]+?)\}\}\}\s*)/gi
+  rx_json = new RegExp('^(\\s*\\{\\{\\{([\\s\\S]+?)\\}\\}\\}\\s*)' + os.EOL, 'gi')
+  rx_yaml = new RegExp('^(\\s*---([\\s\\S]+?)---\\s*)' + os.EOL, 'gi')
   
-  json_match = rx_json.exec(content)
-  # yaml_match = rx_yaml.exec(content)
+  json_match = rx_json.exec(opts.content.toString())
+  yaml_match = rx_yaml.exec(opts.content.toString())
+  
   if json_match?
     json = '{' + json_match[2].replace(/^\s+|\s+$/g, '') + '}'
     opts.content = opts.content.slice(json_match[0].length)
@@ -96,7 +100,7 @@ parse_front_matter = (opts) ->
             file = helpers.find_file(opts.root, url, type: 'data')
             throw new Error('box.data could not find ' + url) unless file?
             
-            new Renderer(root: opts.root, indent: (opts.index or 0) + 1).render(file)
+            new Renderer(root: opts.root, parent: opts.renderer).render(file)
             .then (res) ->
               res.content
     
@@ -105,8 +109,9 @@ parse_front_matter = (opts) ->
       opts.front_matter = sandbox.__foobar__
     catch err
       throw new Error('Error parsing front matter of ' + opts.filename + ': ' + err.message)
-  # else if yaml_match?
-  #   opts.front_matter = 
+  else if yaml_match?
+    opts.content = opts.content.slice(yaml_match[0].length)
+    opts.front_matter = yaml.load(yaml_match[2].replace(/^\s+|\s+$/g, '')) or {}
   else
     opts.front_matter = {}
   
@@ -170,7 +175,7 @@ find_layout = (opts) ->
   meta = {}
   if opts.front_matter?
     meta[k] = v for k, v of opts.front_matter
-  meta[k] = v for k, v of opts.data
+  # meta[k] = v for k, v of opts.data
   
   file = helpers.find_layout_file(opts.root, opts.filename, meta)
   opts.layout = file if file? and file isnt opts.filename
@@ -178,13 +183,55 @@ find_layout = (opts) ->
 render_layout = (opts) ->
   return unless opts.layout?
   
-  new Renderer(root: opts.root, layout_content: opts.content.toString(), indent: (opts.index or 0) + 1).render(opts.layout, opts.data)
+  new Renderer(root: opts.root, parent: opts.renderer, layout_content: opts.content.toString()).render(opts.layout, opts.data)
   .then (res) ->
     opts.content = res.content.toString()
+
+
+Steps.filters =
+  type: (opts, type) -> opts.type is type
+  'layouts-enabled': (opts, bool) ->
+    return true if opts.layouts_disabled is true and bool.toLowerCase() is 'false'
+    return true if !(opts.layouts_disabled is true) and bool.toLowerCase() is 'true'
+    false
+  'has-parent': (opts, bool) ->
+    return true if opts.parent? and bool.toLowerCase() is 'true'
+    return true if !opts.parent? and bool.toLowerCase() is 'false'
+    false
 
 class Renderer
   constructor: (@opts) ->
     throw new Error('Must pass root to Renderer') unless @opts.root?
+    
+    @opts.renderer = @
+    
+    if @opts.parent?.steps?
+      @steps = @opts.parent.steps
+    
+    @steps ?=
+      'pre-process': new Steps(
+        'fetch-file': fetch_file
+        'strip-bom': strip_bom
+        'parse-filename': parse_filename
+        'type:html':
+          'parse-front-matter': parse_front_matter
+          'layouts-enabled:true':
+            'find-layout': find_layout
+      )
+      render: new Steps(
+        render: render
+        'wait-for-promises': wait_for_promises
+      )
+      'post-process': new Steps(
+        'type:html':
+          'layouts-enabled:true':
+            'render-layout': render_layout
+          'has-parent:false':
+            'add-cheerio': add_cheerio
+            'render-styles': render_styles
+            'render-scripts': render_scripts
+            'extract-from-cheerio': extract_from_cheerio
+      )
   
   render: (filename, data = {}) ->
     opts = {}
@@ -193,40 +240,10 @@ class Renderer
     opts.data = data
     opts.promises ?= []
     
-    # console.log Array((opts.indent or 0) * 2 + 1).join('-') + 'START', opts.filename
-    
     q()
-    .then(-> fetch_file(opts))
-    .then(-> parse_filename(opts))
-    
-    .then ->
-      return unless opts.type is 'html'
-      
-      q()
-      .then(-> strip_bom(opts))
-      .then(-> parse_front_matter(opts))
-    
-    .then(-> render(opts))
-    
-    .then ->
-      return unless opts.type is 'html'
-      
-      q()
-      .then(-> wait_for_promises(opts))
-      .then(-> add_cheerio(opts))
-      .then(-> render_styles(opts))
-      .then(-> render_scripts(opts))
-      .then(-> extract_from_cheerio(opts))
-      
-      .then ->
-        return if opts.layouts_disabled
-        
-        q()
-        .then(-> find_layout(opts))
-        .then(-> render_layout(opts))
-    
-    # .then ->
-    #   console.log Array((opts.indent or 0) * 2 + 1).join('-') + 'DONE ', opts.filename
+    .then => @steps['pre-process'].execute(opts)
+    .then => @steps.render.execute(opts)
+    .then => @steps['post-process'].execute(opts)
     .then -> opts
 
 exports.Renderer = Renderer

@@ -2,5 +2,7 @@ exports.type = 'html'
 exports.extension = 'underscore'
 
 exports.process = (opts, data) ->
+  os = require 'os'
   underscore = require 'underscore'
-  underscore.template(opts.content.toString(), null, data)(data).replace(/\n$/, '')
+  rx = new RegExp(os.EOL + '$')
+  underscore.template(opts.content.toString(), null, data)(data).replace(rx, '')

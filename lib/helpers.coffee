@@ -36,6 +36,9 @@ class Tree
   is_dir: (file_path) ->
     @exists(file_path) and Array.isArray(@tree[file_path])
   
+  is_file: (file_path) ->
+    @exists(file_path) and not Array.isArray(@tree[file_path])
+  
   real_path: (file_path) ->
     @tree[file_path]
   
@@ -70,13 +73,25 @@ exports.parse_filename = (filename) ->
     res.type = exts.shift()
   else if res.engines.length > 0
     res.type = engines.by_ext[res.engines[0]].type
-  else
-    res.type = 'html'
+  # else
+  #   res.type = 'html'
   
   res.engines = res.engines.reverse()
   res.base = [res.base].concat(exts.reverse()).join('.')
   
   res
+
+# check for .html, .css, .js
+# check for file that matches actual filename
+# check for opts.type == 'html'
+
+find_individual_file = (tree, relative_path, base, type) ->
+  if relative_path is '/'
+    tree.find('/', base: 'index', type: type)
+  else
+    relative_dir = path.dirname(relative_path)
+    tree.find(relative_dir, base: base, type: type) or
+      tree.find(path.join(relative_dir, base), base: 'index', type: type)
 
 exports.find_file = (root, relative_path, opts = {}) ->
   relative_path = '/' + relative_path.replace(/^\//, '').replace(/\/_/g, '/').trim()
@@ -86,12 +101,12 @@ exports.find_file = (root, relative_path, opts = {}) ->
   base = o.base.replace(/^_/, '')
   type = opts.type or o.type
   
-  if relative_path is '/'
-    res = tree.find('/', base: 'index', type: type)
-  else
-    relative_dir = path.dirname(relative_path)
-    res = tree.find(relative_dir, base: base, type: type) or
-      tree.find(path.join(relative_dir, base), base: 'index', type: type)
+  if engines.by_type[type]?
+    res = find_individual_file(tree, relative_path, base, type)
+  if !res? and tree.is_file(relative_path)
+    res = relative_path
+  if !res? and type isnt 'html'
+    res = find_individual_file(tree, relative_path, base, 'html')
   
   if res? then tree.real_relative_path(res) else null
 
