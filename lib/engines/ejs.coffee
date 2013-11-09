@@ -3,4 +3,4 @@ exports.extension = 'ejs'
 
 exports.process = (opts, data) ->
   ejs = require 'ejs'
-  ejs.render(opts.content.toString(), data)
+  ejs.compile(opts.content.toString(), data)(data)

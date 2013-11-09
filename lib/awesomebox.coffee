@@ -46,6 +46,10 @@ box_methods = (opts) ->
 
 
 
+strip_bom = (opts) ->
+  opts.content = opts.content.toString('utf8')
+  opts.content = content.slice(1) if content.charCodeAt(0) is 0xFEFF
+
 parse_filename = (opts) ->
   parsed = helpers.parse_filename(opts.filename)
   opts.engines = parsed.engines
@@ -71,9 +75,6 @@ render = (opts) ->
   , q()
 
 parse_front_matter = (opts) ->
-  content = opts.content.toString('utf8')
-  content = content.slice(1) if content.charCodeAt(0) is 0xFEFF
-  
   rx_json = /^(\s*\{\{\{([\s\S]+?)\}\}\}\s*)/gi
   # rx_yaml = /^(\s*\{\{\{([\s\S]+?)\}\}\}\s*)/gi
   
@@ -192,7 +193,7 @@ class Renderer
     opts.data = data
     opts.promises ?= []
     
-    console.log Array((opts.indent or 0) * 2 + 1).join('-') + 'START', opts.filename
+    # console.log Array((opts.indent or 0) * 2 + 1).join('-') + 'START', opts.filename
     
     q()
     .then(-> fetch_file(opts))
@@ -202,6 +203,7 @@ class Renderer
       return unless opts.type is 'html'
       
       q()
+      .then(-> strip_bom(opts))
       .then(-> parse_front_matter(opts))
     
     .then(-> render(opts))
@@ -223,8 +225,8 @@ class Renderer
         .then(-> find_layout(opts))
         .then(-> render_layout(opts))
     
-    .then ->
-      console.log Array((opts.indent or 0) * 2 + 1).join('-') + 'DONE ', opts.filename
+    # .then ->
+    #   console.log Array((opts.indent or 0) * 2 + 1).join('-') + 'DONE ', opts.filename
     .then -> opts
 
 exports.Renderer = Renderer
