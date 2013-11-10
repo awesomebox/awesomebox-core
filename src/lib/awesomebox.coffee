@@ -7,6 +7,7 @@ yaml = require 'js-yaml'
 cheerio = require 'cheerio'
 request = require './request'
 
+exports.errors = require './errors'
 exports.engines = require './engines'
 helpers = exports.helpers = require './helpers'
 Steps = require './steps'
@@ -71,10 +72,15 @@ render = (opts) ->
   data[k] = v for k, v of opts.front_matter
   
   opts.engines.reverse().reduce (o, ext) ->
+    engine = exports.engines.by_ext[ext]
     o.then ->
-      q.when(exports.engines.by_ext[ext].process(opts, data))
+      engine.process(opts, data)
     .then (content) ->
       opts.content = content
+    .catch (err) ->
+      err = exports.errors.engine(err, engine, opts, data)
+      engine.enhance_error?(err)
+      throw err
   , q()
 
 parse_front_matter = (opts) ->
@@ -143,13 +149,22 @@ render_styles = (opts) ->
       engine = exports.engines.by_attr_type[type]
       return unless engine?
       
-      q.when(engine.process($el.html(), {}))
+      style_opts =
+        filename: 'Embedded in ' + opts.filename
+        content: $el.html()
+      
+      q()
+      .then(-> engine.process(style_opts, {}))
       .then (content) ->
         script = '<style type="text/css"'
         script += ' ' + k + '="' + v + '"' for k, v of el.attribs when k isnt 'type'
         script += '>' + content + '</style>'
         
         $el.replaceWith(script)
+      .catch (err) ->
+        err = exports.errors.engine(err, engine, style_opts, data)
+        engine.enhance_error?(err)
+        throw err
   )
 
 render_scripts = (opts) ->
@@ -162,13 +177,22 @@ render_scripts = (opts) ->
       engine = exports.engines.by_attr_type[type]
       return unless engine?
       
-      q.when(engine.process($el.html(), {}))
+      script_opts =
+        filename: 'Embedded in ' + opts.filename
+        content: $el.html()
+      
+      q()
+      .then(-> engine.process(script_opts, {}))
       .then (content) ->
         script = '<script type="text/javascript"'
         script += ' ' + k + '="' + v + '"' for k, v of el.attribs when k isnt 'type'
         script += '>' + content + '</script>'
-        
+      
         $el.replaceWith(script)
+      .catch (err) ->
+        err = exports.errors.engine(err, engine, script_opts, {})
+        engine.enhance_error?(err)
+        throw err
   )
 
 find_layout = (opts) ->

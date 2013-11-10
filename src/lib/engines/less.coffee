@@ -19,3 +19,9 @@ exports.process = (opts) ->
   q.ninvoke(parser, 'parse', opts.content.toString())
   .then (tree) ->
     tree.toCSS()
+
+exports.enhance_error = (err) ->
+  o = err.original_error
+  
+  err.line = parseInt(o.line or -1)
+  err.message = o.message
