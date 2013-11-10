@@ -1,6 +1,6 @@
 path = require 'path'
 assert = require 'assert'
-{helpers} = require '../'
+{helpers} = require '../src'
 
 describe 'Helpers', ->
   
