@@ -149,9 +149,9 @@ render_styles = (opts) ->
       engine = exports.engines.by_attr_type[type]
       return unless engine?
       
-      style_opts =
-        filename: 'Embedded in ' + opts.filename
-        content: $el.html()
+      style_opts = {}
+      style_opts[k] = v for k, v of opts
+      style_opts.content = $el.html()
       
       q()
       .then(-> engine.process(style_opts, {}))
@@ -162,7 +162,7 @@ render_styles = (opts) ->
         
         $el.replaceWith(script)
       .catch (err) ->
-        err = exports.errors.engine(err, engine, style_opts, data)
+        err = exports.errors.engine(err, engine, style_opts, {})
         engine.enhance_error?(err)
         throw err
   )
@@ -177,9 +177,9 @@ render_scripts = (opts) ->
       engine = exports.engines.by_attr_type[type]
       return unless engine?
       
-      script_opts =
-        filename: 'Embedded in ' + opts.filename
-        content: $el.html()
+      script_opts = {}
+      script_opts[k] = v for k, v of opts
+      script_opts.content = $el.html()
       
       q()
       .then(-> engine.process(script_opts, {}))
