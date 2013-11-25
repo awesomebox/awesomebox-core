@@ -1,7 +1,7 @@
 {
   "name": "awesomebox-core",
   "description": "Rendering core for awesomebox",
-  "version": "0.0.1",
+  "version": "0.2.0",
   "homepage": "https://github.com/awesomebox/awesomebox-core",
   "author": {
     "name": "Matt Insler",

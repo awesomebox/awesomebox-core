@@ -18,6 +18,8 @@ PARTIAL_INDEX = 12345
 
 box_methods = (opts) ->
   partial = (filename, locals = {}) ->
+    throw new Error('A filename must be specified to render partials') unless filename?
+    
     filename = path.join(path.dirname(opts.filename), filename).replace(/\/_/g, '/') unless filename[0] is '/'
     
     file = helpers.find_file(opts.root, filename)
@@ -42,12 +44,9 @@ box_methods = (opts) ->
     opts.layout_content
   
   {
-    box:
-      content: (filename, locals) ->
-        return partial(filename, locals) if filename?
-        layout()
+    yield: layout
+    render: partial
   }
-
 
 
 strip_bom = (opts) ->
@@ -95,20 +94,19 @@ parse_front_matter = (opts) ->
     opts.content = opts.content.slice(json_match[0].length)
     
     sandbox =
-      box:
-        data: (url) ->
-          if /^https?:\/\//.test(url)
-            request(url)
-            .catch (err) ->
-              throw new Error('box.data could not connect to ' + url) if err.code is 'ENOTFOUND'
-              throw err
-          else
-            file = helpers.find_file(opts.root, url, type: 'data')
-            throw new Error('box.data could not find ' + url) unless file?
-            
-            new Renderer(root: opts.root, parent: opts.renderer).render(file)
-            .then (res) ->
-              res.content
+      data: (url) ->
+        if /^https?:\/\//.test(url)
+          request(url)
+          .catch (err) ->
+            throw new Error('box.data could not connect to ' + url) if err.code is 'ENOTFOUND'
+            throw err
+        else
+          file = helpers.find_file(opts.root, url, type: 'data')
+          throw new Error('box.data could not find ' + url) unless file?
+          
+          new Renderer(root: opts.root, parent: opts.renderer).render(file)
+          .then (res) ->
+            res.content
     
     try
       vm.runInNewContext("this.__foobar__ = #{json};", sandbox)

@@ -1,4 +1,4 @@
-var EISDIR, ENOENT, ENOTDIR, EPERM, Module, create_stats, crypto, fs, fs_exists, fs_read_file, fs_readdir, fs_realpath, fs_rmdir, fs_stat, fs_unlink, fs_utimes, fs_write_file, fs_write_file_sync, get_encoding, get_file, get_file_ref, home_directory, is_windows, node_extension, path, temp_directory, windows_dir, wrap, wrap_fn, wrap_up,
+var EISDIR, ENOENT, ENOTDIR, EPERM, Module, create_stats, crypto, fs, fs_exists, fs_read_file, fs_readdir, fs_realpath, fs_rmdir, fs_stat, fs_unlink, fs_utimes, get_encoding, get_file, get_file_ref, home_directory, is_windows, node_extension, path, temp_directory, windows_dir, wrap, wrap_fn, wrap_up,
   __slice = [].slice;
 
 Module = require('module');
@@ -77,19 +77,17 @@ get_file_ref = function(filename) {
   if (filename == null) {
     return null;
   }
-  filename = filename.replace(/\/*$/, '');
   a = Object.keys(Module.__trojan_source__).map(function(f) {
-    f = f.replace(/\/*$/, '');
-    if (!(filename.length >= f.length)) {
+    if (!(filename.length > f.length)) {
       return null;
     }
-    if (f === filename || f + '/' === filename.slice(0, f.length + 1)) {
-      return {
-        root: f,
-        path: filename.slice(f.length) || '/'
-      };
+    if (f + '/' !== filename.slice(0, f.length + 1)) {
+      return null;
     }
-    return null;
+    return {
+      root: f,
+      path: filename.slice(f.length)
+    };
   }).filter(function(f) {
     return f != null;
   });
@@ -169,7 +167,7 @@ fs_readdir = function(o, filename) {
     throw ENOTDIR(filename);
   }
   return o.file.children.map(function(f) {
-    return f.slice(o.path.replace(/\/*$/, '').length + 1);
+    return f.slice(o.path.length + 1);
   });
 };
 
@@ -182,7 +180,7 @@ fs_read_file = function(o, filename, encoding_or_options) {
     throw EISDIR(filename);
   }
   encoding = get_encoding(encoding_or_options);
-  content = new Buffer(o.file.data, o.file.enc);
+  content = new Buffer(o.file.data, 'base64');
   if (encoding != null) {
     content = content.toString(encoding);
   }
@@ -226,69 +224,6 @@ fs_utimes = function(o, filename, atime, mtime) {
   }
   o.file.stat.atime = new Date(atime).getTime();
   return o.file.stat.mtime = new Date(mtime).getTime();
-};
-
-fs_write_file = function() {
-  var args, callback, o, old_fn;
-  old_fn = arguments[0], args = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
-  if (typeof args[args.length - 1] === 'function') {
-    callback = args.pop();
-  }
-  o = get_file_ref(filename);
-  if (o == null) {
-    return old_fn.apply(null, args);
-  }
-  return setTimeout(function() {
-    var err;
-    try {
-      return callback(null, fs_write_file_sync.apply(null, [(function() {})].concat(__slice.call(args))));
-    } catch (_error) {
-      err = _error;
-      return callback(err);
-    }
-  }, 1);
-};
-
-fs_write_file_sync = function(old_fn, filename, data, options) {
-  var o, time, _ref;
-  o = get_file_ref(filename);
-  if (o == null) {
-    return old_fn(filename, data, options);
-  }
-  if ((o != null ? (_ref = o.file) != null ? _ref.type : void 0 : void 0) === 'dir') {
-    throw EISDIR(filename);
-  }
-  if (!Buffer.isBuffer(data)) {
-    data = new Buffer(data, (options != null ? options.encoding : void 0) || 'utf8');
-  }
-  time = new Date().getTime();
-  o.tree[o.path] = {
-    type: 'file',
-    stat: {
-      dev: 0,
-      mode: options || 0x1b6,
-      nlink: 1,
-      uid: process.getuid(),
-      gid: process.getgid(),
-      rdev: 0,
-      blksize: 4096,
-      ino: 0,
-      size: data.length,
-      blocks: 8,
-      atime: time,
-      mtime: time,
-      ctime: time,
-      isFile: true,
-      isDirectory: false,
-      isBlockDevice: false,
-      isCharacterDevice: false,
-      isSymbolicLink: false,
-      isFIFO: false,
-      isSocket: false
-    },
-    data: data
-  };
-  return null;
 };
 
 node_extension = function(old_fn, module, filename) {
@@ -378,12 +313,10 @@ wrap_up(fs, 'stat', fs_stat);
 
 wrap_up(fs, 'lstat', fs_stat);
 
+wrap_up(fs, 'fstat', fs_stat);
+
 wrap_up(fs, 'unlink', fs_unlink);
 
 wrap_up(fs, 'utimes', fs_utimes);
-
-wrap_fn(fs, 'writeFile', fs_write_file);
-
-wrap_fn(fs, 'writeFileSync', fs_write_file_sync);
 
 wrap_fn(Module._extensions, '.node', node_extension);
