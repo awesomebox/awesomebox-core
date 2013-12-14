@@ -1,5 +1,5 @@
 q = require 'q'
-fs = require 'fs'
+fs = require 'graceful-fs'
 vm = require 'vm'
 os = require 'os'
 path = require 'path'

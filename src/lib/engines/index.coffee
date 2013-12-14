@@ -1,4 +1,4 @@
-fs = require 'fs'
+fs = require 'graceful-fs'
 path = require 'path'
 
 module.exports = fs.readdirSync(__dirname).reduce (o, filename) ->

@@ -1,4 +1,4 @@
-fs = require 'fs'
+fs = require 'graceful-fs'
 path = require 'path'
 engines = require './engines'
 
