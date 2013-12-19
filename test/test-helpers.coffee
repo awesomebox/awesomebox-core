@@ -107,6 +107,15 @@ describe 'Helpers', ->
           engines: []
         }
       )
+    it 'javascripts/main.js', ->
+      assert.deepEqual(
+        helpers.parse_filename('foo.txt')
+        {
+          type: ''
+          base: 'foo.txt'
+          engines: []
+        }
+      )
   
   describe 'find_file', ->
     
