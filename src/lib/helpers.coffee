@@ -7,30 +7,36 @@ class Tree
     @root = root.replace(/\/$/, '')
     @__map()
   
+  __relative_path: (full_path) ->
+    full_path.slice(@root.length).replace(/\/_/g, '/') or '/'
+  
   __map: ->
     tree = {}
-  
-    read_dir = (dir) =>
-      files = fs.readdirSync(dir).map (file) =>
-        return if file[0] is '.'
-        file_path = path.join(dir, file)
-        relative_path = file_path.slice(@root.length).replace(/\/_/g, '/')
-        
-        unless fs.statSync(file_path).isDirectory()
-          tree[relative_path] = file_path
-          return relative_path
-        
-        tree[relative_path] = read_dir(file_path)
-      .filter((f) -> f?)
-      .sort()
-      
-      {
-        path: dir
-        files: files
-      }
-    
-    tree['/'] = read_dir(@root)
+    @__map_dir(tree, @root)
     @tree = tree
+  
+  __map_dir: (tree, dir) ->
+    console.log
+    files = fs.readdirSync(dir).map (file) =>
+      return if file[0] is '.'
+      file_path = path.join(dir, file)
+      
+      if fs.statSync(file_path).isDirectory()
+        @__map_dir(tree, file_path)
+      else
+        @__map_file(tree, file_path)
+      
+      @__relative_path(file_path)
+    
+    .filter((f) -> f?)
+    .sort()
+    
+    tree[@__relative_path(dir)] =
+      path: dir
+      files: files
+  
+  __map_file: (tree, file_path) ->
+    tree[@__relative_path(file_path)] = file_path
   
   subtree: (root_path) ->
     real_path = @tree[root_path.replace(/\/$/, '')]
@@ -64,6 +70,16 @@ class Tree
       o = exports.parse_filename(file)
       return file if o.base is opts.base and o.type is opts.type
     null
+  
+  invalidate: (full_path) ->
+    relative_path = @__relative_path(full_path)
+    if @is_dir(relative_path)
+      for k in Object.keys(@tree)
+        delete @tree[k] if relative_path is k or k.slice(relative_path.length) + '/' is relative_path
+      @__map_dir(@tree, full_path)
+    else
+      delete @tree[relative_path]
+      @__map_file(@tree, full_path)
 
 exports.directory_tree = (root) -> new Tree(root)
 
