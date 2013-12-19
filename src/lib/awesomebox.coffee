@@ -205,6 +205,9 @@ find_layout = (opts) ->
 render_layout = (opts) ->
   return unless opts.layout?
   
+  layout_name = path.basename(opts.layout).split('.')[0]
+  return if opts.parent? and layout_name is 'default' and not opts.front_matter.layout?
+  
   new Renderer(root: opts.root, parent: opts.renderer, layout_content: opts.content.toString()).render(opts.layout, opts.data)
   .then (res) ->
     opts.content = res.content.toString()
